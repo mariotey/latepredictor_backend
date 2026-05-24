@@ -1,16 +1,17 @@
 import logging
 import pandas as pd
 from haversine import haversine, Unit
-from ..services.feature_registry import load_feature_registry
+from ..services.local_feature_registry import get_feature_registry
 import utils.supabase_client as supabase_client
-from utils.logger import setup_logging
+from utils.logger import setup_logger
 from config import CATEGORY_ID_COL
 
-setup_logging()
-logger = logging.getLogger(__name__)
+# Logging setup
+logger = setup_logger()
+
 
 def train_preprocess():
-    feature_registry_dict = load_feature_registry()
+    feature_registry_dict = get_feature_registry()
     logger.info("Loaded feature registry\n")
 
     X_col = [
@@ -37,7 +38,6 @@ def train_preprocess():
 def predict_preprocess(payload):
     # Derive features
     meeting_datetime = payload.datetime_val
-    day_of_week = meeting_datetime.weekday()
     hour = meeting_datetime.hour
 
     if hour >= 3 and hour < 12:
@@ -54,13 +54,13 @@ def predict_preprocess(payload):
     )
 
     X_df = pd.DataFrame([{
-        "day_of_week": day_of_week,
+        "day_of_week": meeting_datetime.weekday(),
         "distance_km": round(distance_km, 2),
         "time_of_day": time_of_day,
         "category": payload.category
     }])
 
-    feature_registry_dict = load_feature_registry()
+    feature_registry_dict = get_feature_registry()
     logger.info("Loaded feature registry\n")
 
     X_col = [

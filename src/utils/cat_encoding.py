@@ -1,10 +1,11 @@
 import logging
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder
-from .logger import setup_logging
+from .logger import setup_logger
 
-setup_logging()
-logger = logging.getLogger(__name__)
+# Logging setup
+logger = setup_logger()
+
 
 def Cat_LabelEncoding(df, cols):
     logger.info(f"Applying Label Encoding on columns: {cols}\n")

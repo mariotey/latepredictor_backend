@@ -5,11 +5,12 @@ from typing import Tuple
 from datetime import datetime
 from pydantic import BaseModel, Field
 from utils import cat_encoding
-from utils.logger import setup_logging
+from utils.logger import setup_logger
 from config import ONEHOT_COL_PATH
 
-setup_logging()
-logger = logging.getLogger(__name__)
+# Logging setup
+logger = setup_logger()
+
 
 class PredictRequest(BaseModel):
     datetime_val: datetime = Field(..., description="ISO 8601 timestamp of the event")

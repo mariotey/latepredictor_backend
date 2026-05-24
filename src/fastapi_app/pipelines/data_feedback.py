@@ -5,11 +5,12 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from .preprocess import feedback_preprocess
 from utils.supabase_client import load_into_supabase, get_latest_feature_registry
-from utils.logger import setup_logging
-from config import FEATURE_REGISTRY_ID_COL
+from utils.logger import setup_logger
+from config import FEATURE_REGISTRY_VER_COL
 
-setup_logging()
-logger = logging.getLogger(__name__)
+# Logging setup
+logger = setup_logger()
+
 
 class DataFeedbackRequest(BaseModel):
     meeting_location: str = Field(..., description="Address of the meeting location")
@@ -28,6 +29,6 @@ def feedback_data(payload, top_models):
     registry_dict = get_latest_feature_registry()
 
     feedback_df["models_used"] = ", ".join(map(str, top_models))
-    feedback_df[FEATURE_REGISTRY_ID_COL] = registry_dict[FEATURE_REGISTRY_ID_COL]
+    feedback_df[f"f_reg_{FEATURE_REGISTRY_VER_COL}"] = registry_dict[FEATURE_REGISTRY_VER_COL]
 
     load_into_supabase(feedback_df)

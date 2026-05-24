@@ -22,7 +22,7 @@ from sklearn.base import clone
 import joblib
 from . import preprocess
 from utils import cat_encoding
-from utils.logger import setup_logging
+from utils.logger import setup_logger
 from config import (
     FASTAPI_MODELS_DIR,
     FASTAPI_MODEL_ARTIFACT_DIR,
@@ -33,8 +33,9 @@ from config import (
 )
 from ..models.models import LINEAR_MODELS, TREE_MODELS
 
-setup_logging()
-logger = logging.getLogger(__name__)
+# Logging setup
+logger = setup_logger()
+
 
 def loocv_mse(model, X, y):
     loo = LeaveOneOut()

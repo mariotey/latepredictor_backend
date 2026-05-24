@@ -4,14 +4,14 @@ import logging
 from ..pipelines.train import train
 from ..pipelines.preprocess import predict_preprocess
 from ..pipelines.predict import run_ensemble_prediction
-from utils.logger import setup_logging
+from utils.logger import setup_logger
 from config import (
     TRAINED_MODELS_PATH,
     TOP_MODELS_PATH
 )
 
-setup_logging()
-logger = logging.getLogger(__name__)
+# Logging setup
+logger = setup_logger()
 
 
 class MLService:

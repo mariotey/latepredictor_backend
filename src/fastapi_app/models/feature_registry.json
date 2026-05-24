@@ -1,13 +1,16 @@
 {
-  "target_col": "late_duration_min",
-  "feature_col": {
-    "numerical": [
-      "distance_km"
-    ],
-    "categorical": [
-      "day_of_week",
-      "category",
-      "time_of_day"
-    ]
-  }
+  "config": {
+    "target_col": "late_duration_min",
+    "feature_col": {
+      "numerical": [
+        "distance_km"
+      ],
+      "categorical": [
+        "day_of_week",
+        "category",
+        "time_of_day"
+      ]
+    }
+  },
+  "version": 1
 }

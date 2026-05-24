@@ -53,64 +53,30 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/feedback" `
     -Body '{"meeting_location": "Bukit Panjang Plaza", "meeting_datetime":"2026-05-06T15:30:00Z","init_latlon":[1.3, 103.8],"meeting_latlon":[1.35, 103.9],"category_id":"4ea1b39c-3be4-4cb8-9279-0befb9c030a8","pred_min":19,"arrived_datetime":"2026-05-06T18:30:00Z"}'
 
 """
-from fastapi import FastAPI, BackgroundTasks, Request
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from .core.fastapi_builder import create_fastapi_app
+from .core.startup import initialize_system
+from fastapi import Request, BackgroundTasks
 
-import logging
-
-from utils.logger import setup_logging
 from .pipelines.predict import PredictRequest
 from .pipelines.data_feedback import DataFeedbackRequest, feedback_data
 
 from .services.ml_service import MLService
-from .services.feature_registry import refresh_feature_registry
+from .services.local_feature_registry import refresh_feature_registry
+
+import logging
+from utils.logger import setup_logger
 
 # Logging setup
-setup_logging()
-logger = logging.getLogger(__name__)
+logger = setup_logger()
 
-# ML service singleton, holds trained models in memory
-ml_service = MLService()
-
-# FastAPI app
-app = FastAPI()
-
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# FastAPI app + ML Service
+app = create_fastapi_app()
+app.state.ml_service = MLService()
 
 # Startup hook
 @app.on_event("startup")
 def startup():
-    logger.info("🚀 Starting API...")
-
-    refresh_feature_registry()
-    ml_service.load_models()
-
-# Global validation error handler
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(
-    request: Request,
-    exc: RequestValidationError
-):
-    body = await request.body()
-
-    logger.error(f"Error: {exc.errors()}")
-    logger.error(f"Request body: {body.decode('utf-8') if body else None}")
-
-    return JSONResponse(
-        status_code=422,
-        content={
-            "detail": exc.errors(),
-            "body": body.decode("utf-8") if body else None
-        }
-    )
+    initialize_system(app.state.ml_service)
 
 # Health check endpoint
 @app.get("/")
@@ -120,7 +86,7 @@ def root():
 # Train endpoint
 @app.post("/train")
 def train_model(background_tasks: BackgroundTasks):
-    background_tasks.add_task(ml_service.retrain)
+    background_tasks.add_task(app.state.ml_service.retrain)
 
     return {
         "status": "Training started"
@@ -128,22 +94,26 @@ def train_model(background_tasks: BackgroundTasks):
 
 # Prediction endpoint
 @app.post("/predict")
-def predict(payload: PredictRequest):
+def predict(payload: PredictRequest, request: Request):
     logger.info(f"Received payload: {payload}")
 
-    if ml_service.trained_models is None or ml_service.top_models is None:
+    ml_service = request.app.state.ml_service
+
+    if app.state.ml_service.trained_models is None or app.state.ml_service.top_models is None:
         return {"error": "Model not trained yet"}
 
-    return ml_service.predict(payload)
+    return app.state.ml_service.predict(payload)
 
 # Feedback endpoint
 @app.post("/feedback")
-def feedback(payload: DataFeedbackRequest):
+def feedback(payload: DataFeedbackRequest, request: Request):
     logger.info(f"Received payload: {payload}")
+
+    ml_service = request.app.state.ml_service
 
     feedback_data(
         payload,
-        ml_service.top_models
+        app.state.ml_service.top_models
     )
 
     return {

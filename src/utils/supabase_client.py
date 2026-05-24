@@ -5,16 +5,18 @@ import joblib
 import logging
 from dotenv import load_dotenv
 from supabase import create_client
-from .logger import setup_logging
+from .logger import setup_logger
 from config import (
     FEATURES_NAME,
     FEATURE_REGISTRY_NAME,
     FEEDBACK_NAME,
-    FEATURE_REGISTRY_ID_COL
+    FEATURE_REGISTRY_CONFIG_COL,
+    FEATURE_REGISTRY_VER_COL
 )
 
-setup_logging()
-logger = logging.getLogger(__name__)
+# Logging setup
+logger = setup_logger()
+
 
 def get_info():
     # Load environment variables
@@ -34,7 +36,7 @@ SUPABASE_URL, SUPABASE_KEY = get_info()
 # Create client once
 supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-def extract_all_data(table_name):
+def extract_all_rows(table_name):
     res = supabase_client.table(table_name).select("*").execute()
 
     return pd.DataFrame(res.data)
@@ -47,8 +49,8 @@ def get_latest_feature_registry(table_name = FEATURE_REGISTRY_NAME):
     latest_config = (
         supabase_client
         .table(FEATURE_REGISTRY_NAME)
-        .select("config, version")
-        .order("version", desc=True)
+        .select(FEATURE_REGISTRY_CONFIG_COL, FEATURE_REGISTRY_VER_COL)
+        .order(FEATURE_REGISTRY_VER_COL, desc=True)
         .limit(1)
         .execute()
     )

@@ -18,8 +18,8 @@ FEEDBACK_NAME: str = "Feedback"
 APPT_ID_COL: str = "appt_id"
 CATEGORY_ID_COL: str = "category_id"
 FEATURES_ID_COL: str = "feature_id"
-FEATURE_REGISTRY_ID_COL: str = "f_reg_id"
 FEATURE_REGISTRY_CONFIG_COL: str = "config"
+FEATURE_REGISTRY_VER_COL: str = "version"
 
 # Directory Paths
 ETL_GOOGLESHEET_DIR: Path = REPO_ROOT / "etl_googlesheet"
