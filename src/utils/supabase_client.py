@@ -43,7 +43,7 @@ def get_feature_store(table_name = FEATURES_NAME):
     res = supabase_client.table(table_name).select("*").execute()
     return pd.DataFrame(res.data)
 
-def get_latest_registry(table_name = FEATURE_REGISTRY_NAME):
+def get_latest_feature_registry(table_name = FEATURE_REGISTRY_NAME):
     latest_config = (
         supabase_client
         .table(FEATURE_REGISTRY_NAME)

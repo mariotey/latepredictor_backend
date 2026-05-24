@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def refresh_feature_registry():
-    registry_config = supabase_client.get_latest_registry()[FEATURE_REGISTRY_CONFIG_COL]
+    registry_config = supabase_client.get_latest_feature_registry()[FEATURE_REGISTRY_CONFIG_COL]
 
     with open(FEATURE_REGISTRY_OUTPUT_PATH, "w") as f:
         json.dump(registry_config, f, indent=2)

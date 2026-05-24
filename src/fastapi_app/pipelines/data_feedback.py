@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 from pydantic import BaseModel, Field
 from .preprocess import feedback_preprocess
-from utils.supabase_client import load_into_supabase, get_latest_registry
+from utils.supabase_client import load_into_supabase, get_latest_feature_registry
 from utils.logger import setup_logging
 from config import FEATURE_REGISTRY_ID_COL
 
@@ -25,7 +25,7 @@ def feedback_data(payload, top_models):
 
     logger.info(f"{feedback_df}\n")
 
-    registry_dict = get_latest_registry()
+    registry_dict = get_latest_feature_registry()
 
     feedback_df["models_used"] = ", ".join(map(str, top_models))
     feedback_df[FEATURE_REGISTRY_ID_COL] = registry_dict[FEATURE_REGISTRY_ID_COL]

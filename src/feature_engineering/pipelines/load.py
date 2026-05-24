@@ -1,7 +1,7 @@
 import pandas as pd
 import json
 from supabase import create_client
-from utils.supabase_client import get_info, get_latest_registry
+from utils.supabase_client import get_info, get_latest_feature_registry
 from config import FEATURES_NAME, FEATURE_REGISTRY_NAME, FEATURES_ID_COL
 
 SUPABASE_URL, SUPABASE_KEY = get_info()
@@ -29,7 +29,7 @@ def load_features_into_supabase(df):
 
 def load_registry_into_supabase(registry_dict):
     # Extract the latest feature registry
-    latest = get_latest_registry()
+    latest = get_latest_feature_registry()
 
     # No previous record → first insert
     if latest is None:
