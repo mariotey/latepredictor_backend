@@ -32,26 +32,33 @@ def load_registry_into_supabase(registry_dict):
     # Extract the latest feature registry
     latest = extract_latest_registry()
 
-    # No previous record → insert
+    # No previous record → first insert
     if latest is None:
         supabase_client.table(FEATURE_REGISTRY_NAME).insert({
+            "version": 1,
             "config": registry_dict
         }).execute()
 
         print("✅ Inserted first registry version\n")
         return
 
+    latest_config = latest["config"]
+    latest_version = latest["version"]
+
     def normalize(d):
         return json.dumps(d, sort_keys=True)
 
     # Compare
-    if normalize(latest) == normalize(registry_dict):
+    if normalize(latest_config) == normalize(registry_dict):
         print("🟡 Registry unchanged — skipping insert\n")
         return
 
+    new_version = latest_version + 1
+
     # Insert new version
     supabase_client.table(FEATURE_REGISTRY_NAME).insert({
+        "version": new_version,
         "config": registry_dict
     }).execute()
 
-    print("✅ Loaded registry into Supabase successfully\n")
+    print(f"✅ Loaded registry (ver {new_version}) into Supabase successfully\n")

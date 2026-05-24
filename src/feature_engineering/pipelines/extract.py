@@ -14,14 +14,18 @@ def extract_all_data(table_name):
     return pd.DataFrame(res.data)
 
 def extract_latest_registry():
-    res = (
+    latest_config = (
         supabase_client
         .table(FEATURE_REGISTRY_NAME)
-        .select("*")
-        .order(FEATURE_REGISTRY_ID_COL, desc=True)
+        .select("config, version")
+        .order("version", desc=True)
         .limit(1)
         .execute()
     )
 
-    data = res.data
-    return data[0]["config"] if data else None
+    data = latest_config.data
+
+    if not data:
+        return None
+
+    return data[0]
