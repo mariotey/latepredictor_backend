@@ -34,23 +34,31 @@ SUPABASE_URL, SUPABASE_KEY = get_info()
 # Create client once
 supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+def extract_all_data(table_name):
+    res = supabase_client.table(table_name).select("*").execute()
+
+    return pd.DataFrame(res.data)
 
 def get_feature_store(table_name = FEATURES_NAME):
     res = supabase_client.table(table_name).select("*").execute()
     return pd.DataFrame(res.data)
 
 def get_latest_registry(table_name = FEATURE_REGISTRY_NAME):
-    res = (
+    latest_config = (
         supabase_client
-        .table(table_name)
-        .select("*")
-        .order(FEATURE_REGISTRY_ID_COL, desc=True)
+        .table(FEATURE_REGISTRY_NAME)
+        .select("config, version")
+        .order("version", desc=True)
         .limit(1)
         .execute()
     )
 
-    data = res.data
-    return data[0] if data else None
+    data = latest_config.data
+
+    if not data:
+        return None
+
+    return data[0]
 
 def load_into_supabase(df, table_name = FEEDBACK_NAME):
     records = df.to_dict("records")

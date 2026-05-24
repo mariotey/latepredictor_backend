@@ -1,5 +1,6 @@
 import yaml
-from .pipelines import extract, transform, load
+from .pipelines import transform, load
+from utils.supabase_client import extract_all_data
 from config import (
     APPT_NAME,
     CATEGORY_NAME,
@@ -11,11 +12,11 @@ from config import (
 
 def run_pipeline():
     # Extract
-    appt_df = extract.extract_all_data(APPT_NAME)
+    appt_df = extract_all_data(APPT_NAME)
     print(f"\nExtracted rows: {len(appt_df)}\n")
     print(f"\n {appt_df.dtypes} \n")
 
-    category = extract.extract_all_data(CATEGORY_NAME)
+    category = extract_all_data(CATEGORY_NAME)
     print(f"\nExtracted rows: {len(appt_df)}\n")
     print(f"\n {category.dtypes} \n")
 
