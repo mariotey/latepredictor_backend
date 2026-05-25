@@ -13,9 +13,7 @@ logger = setup_logger()
 def create_fastapi_app():
     app = FastAPI()
 
-    # ----------------------------
     # CORS Middleware
-    # ----------------------------
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
