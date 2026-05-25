@@ -1,7 +1,7 @@
 import pandas as pd
 import json
 from supabase import create_client
-from utils.supabase_client import get_info, get_latest_feature_registry
+from utils.supabase_utils import get_info, get_latest_feature_registry
 from config import FEATURES_NAME, FEATURE_REGISTRY_NAME, FEATURES_ID_COL
 
 SUPABASE_URL, SUPABASE_KEY = get_info()

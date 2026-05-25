@@ -4,8 +4,7 @@ import logging
 from ..pipelines.train import train
 from ..pipelines.preprocess import train_preprocess, predict_preprocess
 from ..pipelines.predict import run_ensemble_prediction
-from ..pipelines.model_registry import save_model_artefacts, load_model_artefacts
-import utils.supabase_client as supabase_client
+import utils.supabase_utils as supabase_utils
 from utils.logger import setup_logger
 from config import (
     FEATURE_REGISTRY_CONFIG_COL,
@@ -21,7 +20,7 @@ class MLService:
         self.trained_models = None
         self.top_models = None
 
-        feature_registry = supabase_client.get_latest_feature_registry()
+        feature_registry = supabase_utils.get_latest_feature_registry()
 
         self.features = feature_registry[FEATURE_REGISTRY_CONFIG_COL]
         self.feature_registry_ver = feature_registry[FEATURE_REGISTRY_VER_COL]
@@ -30,7 +29,7 @@ class MLService:
 
     def load_models(self):
         try:
-            self.trained_models, self.onehot_cols, self.top_models = load_model_artefacts()
+            self.trained_models, self.onehot_cols, self.top_models = supabase_utils.load_model_artefacts()
             logger.info("✅ Model Artefacts loaded")
 
         except Exception as e:
@@ -44,7 +43,7 @@ class MLService:
             trained_models, top_models, X_onehot_cols, mse = train(X_df, y, category_cols)
 
             # Save Model Artefacts
-            save_model_artefacts(
+            supabase_utils.save_model_artefacts(
                 trained_models=trained_models,
                 onehot_columns=X_onehot_cols,
                 top_models=top_models,

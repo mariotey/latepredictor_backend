@@ -1,9 +1,9 @@
 import logging
 import pandas as pd
 from haversine import haversine, Unit
-import utils.supabase_client as supabase_client
+import utils.supabase_utils as supabase_utils
 from utils.logger import setup_logger
-from config import CATEGORY_ID_COL
+from config import CATEGORY_ID_COL, FEATURES_NAME
 
 # Logging setup
 logger = setup_logger()
@@ -20,7 +20,7 @@ def train_preprocess(features_dict):
 
     category_col = features_dict["feature_col"]["categorical"]
 
-    train_df = supabase_client.get_features()
+    train_df = supabase_utils.extract_all_rows(FEATURES_NAME)
     logger.info(f"Loaded dataset: shape={train_df.shape}\n")
 
     # Basic checks

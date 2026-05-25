@@ -2,7 +2,7 @@ import pandas as pd
 from supabase import create_client
 import datetime
 import math
-from utils.supabase_client import get_info
+from utils.supabase_utils import get_info
 from config import APPT_NAME
 
 SUPABASE_URL, SUPABASE_KEY = get_info()

@@ -1,6 +1,6 @@
 import yaml
 from .pipelines import transform, load
-from utils.supabase_client import extract_all_rows
+from utils.supabase_utils import extract_all_rows
 from config import (
     APPT_NAME,
     CATEGORY_NAME,
