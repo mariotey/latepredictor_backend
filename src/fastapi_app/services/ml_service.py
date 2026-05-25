@@ -1,6 +1,3 @@
-import os
-import joblib
-import logging
 import numpy as np
 from ..pipelines.train import train
 from ..pipelines.preprocess import train_preprocess, predict_preprocess
@@ -17,101 +14,125 @@ from config import (
 logger = setup_logger()
 
 
+class ModelRegistry:
+    def load(self):
+        return supabase_utils.load_model_artefacts()
+
+    def save(self, trained_models, top_models, onehot_cols, feature_ver, mse):
+        supabase_utils.save_model_artefacts(
+            trained_models=trained_models,
+            onehot_columns=onehot_cols,
+            top_models=top_models,
+            feature_registry_ver=feature_ver,
+            mse=mse
+        )
+
+
+class EnsemblePredictor:
+    def __init__(self, trained_models, top_models, onehot_cols, features):
+        self.trained_models = trained_models
+        self.top_models = top_models
+        self.onehot_cols = onehot_cols
+        self.features = features
+
+    def predict(self, payload):
+        X_df, _, category_cols = predict_preprocess(self.features, payload)
+
+        X_label = cat_encoding.Cat_LabelEncoding(X_df, category_cols)
+        X_onehot = cat_encoding.Cat_OneHotEncoding(X_df, category_cols)
+        X_onehot = X_onehot.reindex(columns=self.onehot_cols, fill_value=0)
+
+        preds = []
+
+        logger.info(f"Starting ensemble prediction | models={self.top_models}")
+
+        for name in self.top_models:
+            model_info = self.trained_models[name]
+
+            logger.info(f"Running model: {name} | type={model_info['type']}")
+
+            if model_info["type"] == "linear":
+                pred = model_info["model"].predict(X_onehot)
+            else:
+                pred = model_info["model"].predict(X_label)
+
+            logger.info(
+                f"[{name}] pred stats -> shape={pred.shape}, "
+                f"mean={np.mean(pred):.4f}, std={np.std(pred):.4f}"
+            )
+
+            preds.append(pred)
+
+        if not preds:
+            raise ValueError("No models available for prediction")
+
+        final_pred = float(np.mean(preds, axis=0)[0])
+
+        result = {"pred_min": final_pred}
+
+        logger.info(f"Output: {result}")
+
+        return result
+
+
 class MLService:
     def __init__(self):
-        self.trained_models = None
-        self.top_models = None
+        self.model_registry = ModelRegistry()
+        self.predictor = None
 
         feature_registry = supabase_utils.get_latest_feature_registry()
 
         self.features = feature_registry[FEATURE_REGISTRY_CONFIG_COL]
         self.feature_registry_ver = feature_registry[FEATURE_REGISTRY_VER_COL]
 
-        logger.info(f"📦 Features loaded (ver. {feature_registry[FEATURE_REGISTRY_VER_COL]}) into ML Service")
+        logger.info(
+            f"📦 Features loaded (ver. {self.feature_registry_ver}) into ML Service"
+        )
 
-    def load_models(self):
-        try:
-            artefacts = supabase_utils.load_model_artefacts()
+        self.trained_models = None
+        self.top_models = None
+        self.onehot_cols = None
 
-            if any(x is None for x in artefacts):
-                logger.info("🔥 No Model Artefacts found, attempting to retrain...")
-                self.train()
-                logger.info("✅ Model retrained and loaded")
-                return
+    # Initialization (load or train)
+    def initialize(self):
+        model_artefacts = self.model_registry.load()
 
-            self.trained_models, self.onehot_cols, self.top_models = artefacts
-            logger.info("✅ Model Artefacts loaded")
+        # If missing → retrain pipeline
+        if any(x is None for x in model_artefacts):
+            logger.info("🔥 No Model Artefacts found → training new model")
 
-        except Exception as e:
-            logger.error(f"⚠️ Model Artefacts loading failed: {e}")
-            raise ValueError("Model Artefacts loading failed!")
-
-    def train(self):
-        try:
             train_df = supabase_utils.extract_all_rows(FEATURES_NAME)
 
             X_df, y, category_cols = train_preprocess(self.features, train_df)
 
-            trained_models, top_models, X_onehot_cols, mse = train(X_df, y, category_cols)
+            trained_models, top_models, onehot_cols, mse = train(X_df, y, category_cols)
 
-            # Save Model Artefacts
-            supabase_utils.save_model_artefacts(
-                trained_models=trained_models,
-                onehot_columns=X_onehot_cols,
-                top_models=top_models,
-                feature_registry_ver=self.feature_registry_ver,
-                mse=mse
+            self.model_registry.save(
+                trained_models,
+                top_models,
+                onehot_cols,
+                self.feature_registry_ver,
+                mse
             )
 
-            self.load_models()
+            model_artefacts = self.model_registry.load()
 
-        except Exception as e:
-            logger.error(f"⚠️ Training failed: {e}")
-            raise ValueError("Training failed!")
+        self.trained_models, self.onehot_cols, self.top_models = model_artefacts
 
-        logger.info("✅ Models retrained and loaded")
+        self.predictor = EnsemblePredictor(
+            self.trained_models,
+            self.top_models,
+            self.onehot_cols,
+            self.features
+        )
 
+        logger.info("✅ ML Service initialized successfully")
+
+    # -----------------------------------------------------
+    # Prediction API
+    # -----------------------------------------------------
     def predict(self, payload):
-        X_df, _, category_cols = predict_preprocess(self.features, payload)
+        if self.predictor is None:
+            raise ValueError("Model not initialized. Call initialize() first.")
 
-        try:
-            preds = []
-
-            logger.info(f"Starting ensemble prediction | models={self.top_models}")
-            logger.info(f"Input shape: {X_df.shape}")
-            logger.info(f"Input preview:\n{X_df.head()}")
-
-            X_label = cat_encoding.Cat_LabelEncoding(X_df, category_cols)
-            X_onehot = cat_encoding.Cat_OneHotEncoding(X_df, category_cols)
-            X_onehot = X_onehot.reindex(columns=self.onehot_cols, fill_value=0)
-
-            for name in self.top_models:
-                model_info = self.trained_models[name]
-
-                logger.info(f"Running model: {name} | type={model_info['type']}")
-
-                if model_info["type"] == "linear":
-                    pred = model_info["model"].predict(X_onehot)
-                else:
-                    pred = model_info["model"].predict(X_label)
-
-                logger.info(
-                    f"[{name}] prediction stats -> shape={pred.shape}, "
-                    f"mean={np.mean(pred):.4f}, std={np.std(pred):.4f}"
-                )
-
-                preds.append(pred)
-
-            logger.info("Inference complete")
-
-            pred = np.mean(preds, axis=0)[0]
-
-        except Exception as e:
-            logger.error(f"Prediction failed: {e}")
-            raise ValueError("Model not trained!")
-
-        result = {"pred_min": float(pred)}
-
-        logger.info(f"Output:\n{result}")
-
-        return result
+        return self.predictor.predict(payload)

@@ -35,18 +35,6 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/predict" `
 
 ----------------------------------------------------------------------
 
-HOW TRAINING WORKS
-
-POST /train:
-    - Runs train() in background thread
-    - Saves model artifacts
-    - Reloads models into memory
-
-Note:
-    Training is asynchronous and non-blocking.
-
-----------------------------------------------------------------------
-
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/feedback" `
     -Method POST `
     -ContentType "application/json" `
@@ -58,7 +46,6 @@ from .core.request_schema import PredictRequest, FeedbackRequest
 from fastapi import Request, BackgroundTasks
 from .pipelines.data_feedback import feedback_data
 from .services.ml_service import MLService
-import logging
 from utils.logger import setup_logger
 
 # Logging setup
@@ -73,7 +60,7 @@ app.state.ml_service = MLService()
 def startup():
     logger.info("🚀 Initializing...")
 
-    app.state.ml_service.load_models()
+    app.state.ml_service.initialize()
 
     logger.info("✅ Initialization complete")
 
@@ -81,15 +68,6 @@ def startup():
 @app.get("/")
 def root():
     return {"message": "API running"}
-
-# Train endpoint
-@app.post("/train")
-def train_model(background_tasks: BackgroundTasks):
-    background_tasks.add_task(app.state.ml_service.train)
-
-    return {
-        "status": "Training started"
-    }
 
 # Prediction endpoint
 @app.post("/predict")
