@@ -21,14 +21,12 @@ class DataFeedbackRequest(BaseModel):
     pred_min: float = Field(..., description="Predicted duration in minutes")
     arrived_datetime: datetime = Field(..., description="ISO 8601 timestamp of actual arrival")
 
-def feedback_data(payload, top_models):
+def feedback_data(ml_service, payload):
     feedback_df = feedback_preprocess(payload)
 
     logger.info(f"{feedback_df}\n")
 
-    registry_dict = get_latest_feature_registry()
-
-    feedback_df["models_used"] = ", ".join(map(str, top_models))
-    feedback_df[f"f_reg_{FEATURE_REGISTRY_VER_COL}"] = registry_dict[FEATURE_REGISTRY_VER_COL]
+    feedback_df["models_used"] = ", ".join(map(str, ml_service.top_models))
+    feedback_df[f"f_reg_{FEATURE_REGISTRY_VER_COL}"] = ml_service.feature_registry_ver
 
     load_into_supabase(feedback_df)

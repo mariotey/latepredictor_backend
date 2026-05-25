@@ -63,12 +63,10 @@ def loocv_mse(model, X, y):
     return mse
 
 
-def train():
-    X_raw, y, category_cols = preprocess.train_preprocess()
-
+def train(X_df, y, category_cols):
     # Encoding
-    X_label = cat_encoding.Cat_LabelEncoding(X_raw, category_cols)
-    X_onehot = cat_encoding.Cat_OneHotEncoding(X_raw, category_cols)
+    X_label = cat_encoding.Cat_LabelEncoding(X_df, category_cols)
+    X_onehot = cat_encoding.Cat_OneHotEncoding(X_df, category_cols)
 
     logger.info(f"Encoded datasets ready | Label: {X_label.shape}, OneHot: {X_onehot.shape}\n")
 
@@ -131,6 +129,7 @@ def train():
         }
 
         logger.info(f"Training of {model_name} complete\n\n")
+
 
     os.makedirs(FASTAPI_MODELS_DIR, exist_ok=True)
     os.makedirs(FASTAPI_MODEL_ARTIFACT_DIR, exist_ok=True)

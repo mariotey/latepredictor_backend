@@ -1,6 +1,7 @@
 import pandas as pd
 import json
 import os
+import io
 import joblib
 import logging
 from dotenv import load_dotenv
@@ -24,14 +25,15 @@ def get_info():
 
     SUPABASE_URL = os.getenv("SUPABASE_URL")
     SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY")
+    SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 
     # Check if the values obtained are valid
     if not SUPABASE_URL or not SUPABASE_KEY:
-        raise ValueError("Missing SUPABASE_URL or SUPABASE_KEY")
+        raise ValueError("Missing SUPABASE_URL, SUPABASE_KEY or SUPABASE_BUCKET")
 
-    return SUPABASE_URL, SUPABASE_KEY
+    return SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET
 
-SUPABASE_URL, SUPABASE_KEY = get_info()
+SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET = get_info()
 
 # Create client once
 supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -41,7 +43,7 @@ def extract_all_rows(table_name):
 
     return pd.DataFrame(res.data)
 
-def get_feature_store(table_name = FEATURES_NAME):
+def get_features(table_name = FEATURES_NAME):
     res = supabase_client.table(table_name).select("*").execute()
     return pd.DataFrame(res.data)
 
@@ -75,3 +77,14 @@ def load_into_supabase(df, table_name = FEEDBACK_NAME):
     supabase_client.table(table_name).insert(records).execute()
 
     print("✅ Loaded into Supabase successfully\n")
+
+def upload_model_to_supabase(obj, path: str):
+    buffer = io.BytesIO()
+    joblib.dump(obj, buffer)
+    buffer.seek(0)
+
+    supabase_client.storage.from_(SUPABASE_BUCKET).upload(
+        path,
+        buffer.getvalue(),
+        file_options={"content-type": "application/octet-stream"}
+    )

@@ -1,7 +1,6 @@
 import logging
 import pandas as pd
 from haversine import haversine, Unit
-from ..services.local_feature_registry import get_feature_registry
 import utils.supabase_client as supabase_client
 from utils.logger import setup_logger
 from config import CATEGORY_ID_COL
@@ -10,21 +9,18 @@ from config import CATEGORY_ID_COL
 logger = setup_logger()
 
 
-def train_preprocess():
-    feature_registry_dict = get_feature_registry()
-    logger.info("Loaded feature registry\n")
-
+def train_preprocess(features_dict):
     X_col = [
         col
-        for col_types in feature_registry_dict["feature_col"].values()
+        for col_types in features_dict["feature_col"].values()
         for col in col_types
     ]
 
-    y_col = feature_registry_dict["target_col"]
+    y_col = features_dict["target_col"]
 
-    category_col = feature_registry_dict["feature_col"]["categorical"]
+    category_col = features_dict["feature_col"]["categorical"]
 
-    train_df = supabase_client.get_feature_store()
+    train_df = supabase_client.get_features()
     logger.info(f"Loaded dataset: shape={train_df.shape}\n")
 
     # Basic checks
@@ -35,7 +31,7 @@ def train_preprocess():
 
     return train_df[X_col], train_df[y_col], category_col
 
-def predict_preprocess(payload):
+def predict_preprocess(features_dict, payload):
     # Derive features
     meeting_datetime = payload.datetime_val
     hour = meeting_datetime.hour
@@ -60,17 +56,14 @@ def predict_preprocess(payload):
         "category": payload.category
     }])
 
-    feature_registry_dict = get_feature_registry()
-    logger.info("Loaded feature registry\n")
-
     X_col = [
         col
-        for col_types in feature_registry_dict["feature_col"].values()
+        for col_types in features_dict["feature_col"].values()
         for col in col_types
     ]
 
-    category_col = feature_registry_dict["feature_col"]["categorical"]
-    target_col = feature_registry_dict["target_col"]
+    category_col = features_dict["feature_col"]["categorical"]
+    target_col = features_dict["target_col"]
 
     X_df = X_df[X_col]
 

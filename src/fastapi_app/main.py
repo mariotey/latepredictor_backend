@@ -54,14 +54,12 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/feedback" `
 
 """
 from .core.fastapi_builder import create_fastapi_app
-from .core.startup import initialize_system
 from fastapi import Request, BackgroundTasks
 
 from .pipelines.predict import PredictRequest
 from .pipelines.data_feedback import DataFeedbackRequest, feedback_data
 
 from .services.ml_service import MLService
-from .services.local_feature_registry import refresh_feature_registry
 
 import logging
 from utils.logger import setup_logger
@@ -76,7 +74,11 @@ app.state.ml_service = MLService()
 # Startup hook
 @app.on_event("startup")
 def startup():
-    initialize_system(app.state.ml_service)
+    logger.info("🚀 Initializing...")
+
+    app.state.ml_service.load_models()
+
+    logger.info("✅ Initialization complete")
 
 # Health check endpoint
 @app.get("/")
@@ -86,7 +88,7 @@ def root():
 # Train endpoint
 @app.post("/train")
 def train_model(background_tasks: BackgroundTasks):
-    background_tasks.add_task(app.state.ml_service.retrain)
+    background_tasks.add_task(app.state.ml_service.train)
 
     return {
         "status": "Training started"
@@ -112,8 +114,8 @@ def feedback(payload: DataFeedbackRequest, request: Request):
     ml_service = request.app.state.ml_service
 
     feedback_data(
-        payload,
-        app.state.ml_service.top_models
+        app.state.ml_service,
+        payload
     )
 
     return {

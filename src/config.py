@@ -30,7 +30,6 @@ FASTAPI_MODEL_ARTIFACT_DIR: Path = FASTAPI_MODELS_DIR / "artifacts"
 
 # Feature Registry Path
 FEATURE_REGISTRY_INPUT_PATH: Path = FEATURE_ENGINEERING_DIR / "feature_registry.yaml"
-FEATURE_REGISTRY_OUTPUT_PATH: Path = FASTAPI_MODELS_DIR / "feature_registry.json"
 
 # Model Artifact Paths
 TRAINED_MODELS_PATH: Path = FASTAPI_MODEL_ARTIFACT_DIR / "trained_models.pkl"
