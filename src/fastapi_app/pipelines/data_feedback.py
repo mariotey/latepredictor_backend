@@ -1,5 +1,5 @@
 import logging
-from ..pipelines.preprocess import feedback_preprocess
+from .preprocess import feedback_preprocess
 from utils.supabase_utils import load_table_into_supabase
 from utils.logger import setup_logger
 from config import FEATURE_REGISTRY_VER_COL

@@ -56,7 +56,7 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/feedback" `
 from .core.fastapi_builder import create_fastapi_app
 from .core.request_schema import PredictRequest, FeedbackRequest
 from fastapi import Request, BackgroundTasks
-from .services.data_feedback import feedback_data
+from .pipelines.data_feedback import feedback_data
 from .services.ml_service import MLService
 import logging
 from utils.logger import setup_logger
