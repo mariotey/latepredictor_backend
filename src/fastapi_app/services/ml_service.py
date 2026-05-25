@@ -52,7 +52,7 @@ class MLService:
                 mse=mse
             )
 
-            # self.load_models()
+            self.load_models()
 
         except Exception as e:
             logger.error(f"⚠️ Training failed: {e}")
