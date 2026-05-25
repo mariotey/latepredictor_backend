@@ -10,6 +10,7 @@ from .logger import setup_logger
 from config import (
     FEATURES_NAME,
     FEATURE_REGISTRY_NAME,
+    MODEL_REGISTRY_NAME,
     FEEDBACK_NAME,
     FEATURE_REGISTRY_CONFIG_COL,
     FEATURE_REGISTRY_VER_COL
@@ -28,28 +29,28 @@ def get_info():
     SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 
     # Check if the values obtained are valid
-    if not SUPABASE_URL or not SUPABASE_KEY:
-        raise ValueError("Missing SUPABASE_URL, SUPABASE_KEY or SUPABASE_BUCKET")
+    if not all([SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET]):
+        raise ValueError("Missing Supabase configuration")
 
     return SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET
 
 SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET = get_info()
 
 # Create client once
-supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_CLIENT = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def extract_all_rows(table_name):
-    res = supabase_client.table(table_name).select("*").execute()
+    res = SUPABASE_CLIENT.table(table_name).select("*").execute()
 
     return pd.DataFrame(res.data)
 
 def get_features(table_name = FEATURES_NAME):
-    res = supabase_client.table(table_name).select("*").execute()
+    res = SUPABASE_CLIENT.table(table_name).select("*").execute()
     return pd.DataFrame(res.data)
 
 def get_latest_feature_registry(table_name = FEATURE_REGISTRY_NAME):
-    latest_config = (
-        supabase_client
+    res = (
+        SUPABASE_CLIENT
         .table(FEATURE_REGISTRY_NAME)
         .select(FEATURE_REGISTRY_CONFIG_COL, FEATURE_REGISTRY_VER_COL)
         .order(FEATURE_REGISTRY_VER_COL, desc=True)
@@ -57,12 +58,27 @@ def get_latest_feature_registry(table_name = FEATURE_REGISTRY_NAME):
         .execute()
     )
 
-    data = latest_config.data
+    data = res.data
 
     if not data:
-        return None
+        raise ValueError(f"No features found in {table_name}")
 
     return data[0]
+
+def get_latest_model_registry(table_name = MODEL_REGISTRY_NAME):
+    res = (
+        SUPABASE_CLIENT
+        .table(MODEL_REGISTRY_NAME)
+        .select("*")
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if not res.data:
+        raise ValueError(f"No models found in {table_name}")
+
+    return res.data[0]
 
 def load_into_supabase(df, table_name = FEEDBACK_NAME):
     records = df.to_dict("records")
@@ -74,17 +90,6 @@ def load_into_supabase(df, table_name = FEEDBACK_NAME):
                 r[k] = None
 
     # Insert data
-    supabase_client.table(table_name).insert(records).execute()
+    SUPABASE_CLIENT.table(table_name).insert(records).execute()
 
     print("✅ Loaded into Supabase successfully\n")
-
-def upload_model_to_supabase(obj, path: str):
-    buffer = io.BytesIO()
-    joblib.dump(obj, buffer)
-    buffer.seek(0)
-
-    supabase_client.storage.from_(SUPABASE_BUCKET).upload(
-        path,
-        buffer.getvalue(),
-        file_options={"content-type": "application/octet-stream"}
-    )

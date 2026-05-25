@@ -24,11 +24,6 @@ from . import preprocess
 from utils import cat_encoding
 from utils.logger import setup_logger
 from config import (
-    FASTAPI_MODELS_DIR,
-    FASTAPI_MODEL_ARTIFACT_DIR,
-    TOP_MODELS_PATH,
-    TRAINED_MODELS_PATH,
-    ONEHOT_COL_PATH,
     ENSEMBLE_NUM
 )
 from ..models.models import LINEAR_MODELS, TREE_MODELS
@@ -130,16 +125,12 @@ def train(X_df, y, category_cols):
 
         logger.info(f"Training of {model_name} complete\n\n")
 
+    ensemble_mse = np.mean(
+        [results[m]["mse"] for m in top_models]
+    )
 
-    os.makedirs(FASTAPI_MODELS_DIR, exist_ok=True)
-    os.makedirs(FASTAPI_MODEL_ARTIFACT_DIR, exist_ok=True)
+    return trained_models, top_models, X_onehot.columns, ensemble_mse
 
-    joblib.dump(trained_models, TRAINED_MODELS_PATH)
-    joblib.dump(top_models, TOP_MODELS_PATH)
-    joblib.dump(X_onehot.columns, ONEHOT_COL_PATH)
-
-    logger.info(f"Saved models → {TRAINED_MODELS_PATH}\n")
-    logger.info(f"Saved top models → {TOP_MODELS_PATH}\n")
 
 if __name__ == "__main__":
     train()

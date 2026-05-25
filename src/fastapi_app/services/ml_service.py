@@ -4,13 +4,12 @@ import logging
 from ..pipelines.train import train
 from ..pipelines.preprocess import train_preprocess, predict_preprocess
 from ..pipelines.predict import run_ensemble_prediction
+from ..pipelines.model_registry import save_model_artefacts, load_model_artefacts
 import utils.supabase_client as supabase_client
 from utils.logger import setup_logger
 from config import (
-    TRAINED_MODELS_PATH,
-    TOP_MODELS_PATH,
     FEATURE_REGISTRY_CONFIG_COL,
-    FEATURE_REGISTRY_VER_COL
+    FEATURE_REGISTRY_VER_COL,
 )
 
 # Logging setup
@@ -24,42 +23,42 @@ class MLService:
 
         feature_registry = supabase_client.get_latest_feature_registry()
 
-        if feature_registry is None:
-            raise ValueError(
-                "Feature registry not loaded"
-            )
-
         self.features = feature_registry[FEATURE_REGISTRY_CONFIG_COL]
         self.feature_registry_ver = feature_registry[FEATURE_REGISTRY_VER_COL]
 
         logger.info(f"📦 Features loaded (ver. {feature_registry[FEATURE_REGISTRY_VER_COL]}) into ML Service")
 
     def load_models(self):
-        if not os.path.exists(TRAINED_MODELS_PATH):
-            logger.info("⚠️ Model file missing. Run /train first.")
-            raise FileNotFoundError("Trained model not found")
-
-        self.trained_models = joblib.load(TRAINED_MODELS_PATH)
-
-        if not os.path.exists(TOP_MODELS_PATH):
-            logger.info("⚠️ Top Model file missing. Run /train first.")
-            raise FileNotFoundError("Top models not found")
-
-        self.top_models = joblib.load(TOP_MODELS_PATH)
-
-        logger.info("✅ Models loaded")
-
-    def train(self):
-        X_df, y, category_cols = train_preprocess(self.features)
-
         try:
-            train(X_df, y, category_cols)
-
-            self.load_models()
+            self.trained_models, self.onehot_cols, self.top_models = load_model_artefacts()
+            logger.info("✅ Model Artefacts loaded")
 
         except Exception as e:
-            logger.error(f"Training failed: {e}")
+            logger.error(f"⚠️ Model Artefacts loading failed: {e}")
+            raise ValueError("Model Artefacts loading failed!")
+
+    def train(self):
+        try:
+            X_df, y, category_cols = train_preprocess(self.features)
+
+            trained_models, top_models, X_onehot_cols, mse = train(X_df, y, category_cols)
+
+            # Save Model Artefacts
+            save_model_artefacts(
+                trained_models=trained_models,
+                onehot_columns=X_onehot_cols,
+                top_models=top_models,
+                feature_registry_ver=self.feature_registry_ver,
+                mse=mse
+            )
+
+            # self.load_models()
+
+        except Exception as e:
+            logger.error(f"⚠️ Training failed: {e}")
             raise ValueError("Training failed!")
+
+        logger.info("✅ Models retrained and loaded")
 
     def predict(self, payload):
         X_df, _, category_cols = predict_preprocess(self.features, payload)
@@ -69,7 +68,8 @@ class MLService:
                 X_df,
                 category_cols,
                 self.trained_models,
-                self.top_models
+                self.top_models,
+                self.onehot_cols
             )
 
         except Exception as e:

@@ -6,7 +6,6 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 from utils import cat_encoding
 from utils.logger import setup_logger
-from config import ONEHOT_COL_PATH
 
 # Logging setup
 logger = setup_logger()
@@ -19,18 +18,16 @@ class PredictRequest(BaseModel):
     category: str = Field(..., description="Activity category (e.g. dinner/drinks)")
 
 
-def run_ensemble_prediction(X_df, category_cols, trained_models, top_models):
+def run_ensemble_prediction(X_df, category_cols, trained_models, top_models, onehot_cols_artefact):
     preds = []
 
     logger.info(f"Starting ensemble prediction | models={top_models}")
     logger.info(f"Input shape: {X_df.shape}")
     logger.info(f"Input preview:\n{X_df.head()}")
 
-    ONEHOT_COLUMNS = joblib.load(ONEHOT_COL_PATH)
-
     X_label = cat_encoding.Cat_LabelEncoding(X_df, category_cols)
     X_onehot = cat_encoding.Cat_OneHotEncoding(X_df, category_cols)
-    X_onehot = X_onehot.reindex(columns=ONEHOT_COLUMNS, fill_value=0)
+    X_onehot = X_onehot.reindex(columns=onehot_cols_artefact, fill_value=0)
 
     for name in top_models:
         model_info = trained_models[name]

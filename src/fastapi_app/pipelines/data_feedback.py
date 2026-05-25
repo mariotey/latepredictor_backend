@@ -21,6 +21,7 @@ class DataFeedbackRequest(BaseModel):
     pred_min: float = Field(..., description="Predicted duration in minutes")
     arrived_datetime: datetime = Field(..., description="ISO 8601 timestamp of actual arrival")
 
+
 def feedback_data(ml_service, payload):
     feedback_df = feedback_preprocess(payload)
 
