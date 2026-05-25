@@ -31,12 +31,16 @@ class MLService:
 
     def load_models(self):
         try:
-            self.trained_models, self.onehot_cols, self.top_models = supabase_utils.load_model_artefacts()
+            artefacts = supabase_utils.load_model_artefacts()
 
-            if any(x is None for x in (self.trained_models, self.onehot_cols, self.top_models)):
+            if any(x is None for x in artefacts):
                 logger.info("🔥 No Model Artefacts found, attempting to retrain...")
                 self.train()
-                logger.info("✅ Model Artefacts loaded")
+                logger.info("✅ Model retrained and loaded")
+                return
+
+            self.trained_models, self.onehot_cols, self.top_models = artefacts
+            logger.info("✅ Model Artefacts loaded")
 
         except Exception as e:
             logger.error(f"⚠️ Model Artefacts loading failed: {e}")

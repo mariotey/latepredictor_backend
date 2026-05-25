@@ -103,27 +103,32 @@ def train(X_df, y, category_cols):
     logger.info("Retraining top models...\n")
 
     for model_name, model_result in results.items():
-        # Create a fresh copy of the model
-        model = clone(model_result["model"])
+        try:
+            # Create a fresh copy of the model
+            model = clone(model_result["model"])
 
-        # Choose correct feature representation
-        # - Linear models → one-hot encoded features
-        # - Tree models   → label encoded features
-        if model_result["type"] == "linear":
-            logger.info(f"Training {model_name} on OneHot features")
-            model.fit(X_onehot, y)
-        else:
-            logger.info(f"Training {model_name} on LabelEncoded features")
-            model.fit(X_label, y)
+            # Choose correct feature representation
+            # - Linear models → one-hot encoded features
+            # - Tree models   → label encoded features
+            if model_result["type"] == "linear":
+                logger.info(f"Training {model_name} on OneHot features")
+                model.fit(X_onehot, y)
+            else:
+                logger.info(f"Training {model_name} on LabelEncoded features")
+                model.fit(X_label, y)
 
-        # Store trained model + metadata
-        trained_models[model_name] = {
-            "model": model,
-            "type": model_result["type"],
-            "mse": model_result["mse"]
-        }
+            # Store trained model + metadata
+            trained_models[model_name] = {
+                "model": model,
+                "type": model_result["type"],
+                "mse": model_result["mse"]
+            }
 
-        logger.info(f"Training of {model_name} complete\n\n")
+            logger.info(f"Training of {model_name} complete\n\n")
+
+        except Exception as e:
+            raise ValueError(f"❌ Failed training {model_name}: {repr(e)}")
+            continue
 
     ensemble_mse = np.mean(
         [results[m]["mse"] for m in top_models]
