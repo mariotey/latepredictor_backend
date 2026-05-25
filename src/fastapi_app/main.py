@@ -98,10 +98,10 @@ def predict(payload: PredictRequest, request: Request):
 
     ml_service = request.app.state.ml_service
 
-    if app.state.ml_service.trained_models is None or app.state.ml_service.top_models is None:
+    if ml_service.trained_models is None or ml_service.top_models is None:
         return {"error": "Model not trained yet"}
 
-    return app.state.ml_service.predict(payload)
+    return ml_service.predict(payload)
 
 # Feedback endpoint
 @app.post("/feedback")
