@@ -148,9 +148,7 @@ def save_model_artefacts(
     save_artifact(onehot_columns, columns_path)
 
 
-def load_model_artefacts():
-    model_registry = get_latest_model_registry()
-
+def get_model_artefacts(model_registry):
     if not model_registry:
         return None, None, None
 

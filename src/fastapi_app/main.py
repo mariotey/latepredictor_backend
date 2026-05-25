@@ -86,10 +86,8 @@ def predict(payload: PredictRequest, request: Request):
 def feedback(payload: FeedbackRequest, request: Request):
     logger.info(f"Received payload: {payload}")
 
-    ml_service = request.app.state.ml_service
-
     feedback_data(
-        app.state.ml_service,
+        request.app.state.ml_service,
         payload
     )
 

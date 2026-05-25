@@ -21,6 +21,7 @@ CATEGORY_ID_COL: str = "category_id"
 FEATURES_ID_COL: str = "feature_id"
 FEATURE_REGISTRY_CONFIG_COL: str = "config"
 FEATURE_REGISTRY_VER_COL: str = "version"
+MODEL_REGISTRY_ID_COL: str = "model_id"
 MODEL_REGISTRY_TOP_MODELS_COL: str = "top_models"
 
 # Directory Paths

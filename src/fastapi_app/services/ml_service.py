@@ -14,20 +14,6 @@ from config import (
 logger = setup_logger()
 
 
-class ModelRegistry:
-    def load(self):
-        return supabase_utils.load_model_artefacts()
-
-    def save(self, trained_models, top_models, onehot_cols, feature_ver, mse):
-        supabase_utils.save_model_artefacts(
-            trained_models=trained_models,
-            onehot_columns=onehot_cols,
-            top_models=top_models,
-            feature_registry_ver=feature_ver,
-            mse=mse
-        )
-
-
 class EnsemblePredictor:
     def __init__(self, trained_models, top_models, onehot_cols, features):
         self.trained_models = trained_models
@@ -77,13 +63,11 @@ class EnsemblePredictor:
 
 class MLService:
     def __init__(self):
-        self.model_registry = ModelRegistry()
-        self.predictor = None
+        self.model_registry = supabase_utils.get_latest_model_registry()
 
-        feature_registry = supabase_utils.get_latest_feature_registry()
-
-        self.features = feature_registry[FEATURE_REGISTRY_CONFIG_COL]
-        self.feature_registry_ver = feature_registry[FEATURE_REGISTRY_VER_COL]
+        feature_registry_info = supabase_utils.get_latest_feature_registry()
+        self.feature_registry = feature_registry_info[FEATURE_REGISTRY_CONFIG_COL]
+        self.feature_registry_ver = feature_registry_info[FEATURE_REGISTRY_VER_COL]
 
         logger.info(
             f"📦 Features loaded (ver. {self.feature_registry_ver}) into ML Service"
@@ -92,10 +76,11 @@ class MLService:
         self.trained_models = None
         self.top_models = None
         self.onehot_cols = None
+        self.predictor = None
 
     # Initialization (load or train)
     def initialize(self):
-        model_artefacts = self.model_registry.load()
+        model_artefacts = supabase_utils.get_model_artefacts(self.model_registry)
 
         # If missing → retrain pipeline
         if any(x is None for x in model_artefacts):
@@ -103,19 +88,19 @@ class MLService:
 
             train_df = supabase_utils.extract_all_rows(FEATURES_NAME)
 
-            X_df, y, category_cols = train_preprocess(self.features, train_df)
+            X_df, y, category_cols = train_preprocess(self.feature_registry, train_df)
 
             trained_models, top_models, onehot_cols, mse = train(X_df, y, category_cols)
 
-            self.model_registry.save(
-                trained_models,
-                top_models,
-                onehot_cols,
-                self.feature_registry_ver,
-                mse
+            supabase_utils.save_model_artefacts(
+                trained_models=trained_models,
+                onehot_columns=onehot_cols,
+                top_models=top_models,
+                feature_registry_ver=self.feature_registry_ver,
+                mse=mse
             )
 
-            model_artefacts = self.model_registry.load()
+            model_artefacts = supabase_utils.get_model_artefacts(self.model_registry)
 
         self.trained_models, self.onehot_cols, self.top_models = model_artefacts
 
@@ -123,14 +108,12 @@ class MLService:
             self.trained_models,
             self.top_models,
             self.onehot_cols,
-            self.features
+            self.feature_registry
         )
 
         logger.info("✅ ML Service initialized successfully")
 
-    # -----------------------------------------------------
-    # Prediction API
-    # -----------------------------------------------------
+    # Prediction
     def predict(self, payload):
         if self.predictor is None:
             raise ValueError("Model not initialized. Call initialize() first.")
