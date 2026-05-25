@@ -54,13 +54,10 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/feedback" `
 
 """
 from .core.fastapi_builder import create_fastapi_app
+from .core.request_schema import PredictRequest, FeedbackRequest
 from fastapi import Request, BackgroundTasks
-
-from .pipelines.predict import PredictRequest
-from .pipelines.data_feedback import DataFeedbackRequest, feedback_data
-
+from .services.data_feedback import feedback_data
 from .services.ml_service import MLService
-
 import logging
 from utils.logger import setup_logger
 
@@ -108,7 +105,7 @@ def predict(payload: PredictRequest, request: Request):
 
 # Feedback endpoint
 @app.post("/feedback")
-def feedback(payload: DataFeedbackRequest, request: Request):
+def feedback(payload: FeedbackRequest, request: Request):
     logger.info(f"Received payload: {payload}")
 
     ml_service = request.app.state.ml_service

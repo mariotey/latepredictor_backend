@@ -1,10 +1,11 @@
 import os
 import joblib
 import logging
+import numpy as np
 from ..pipelines.train import train
 from ..pipelines.preprocess import train_preprocess, predict_preprocess
-from ..pipelines.predict import run_ensemble_prediction
 import utils.supabase_utils as supabase_utils
+from utils import cat_encoding
 from utils.logger import setup_logger
 from config import (
     FEATURE_REGISTRY_CONFIG_COL,
@@ -63,13 +64,36 @@ class MLService:
         X_df, _, category_cols = predict_preprocess(self.features, payload)
 
         try:
-            pred = run_ensemble_prediction(
-                X_df,
-                category_cols,
-                self.trained_models,
-                self.top_models,
-                self.onehot_cols
-            )
+            preds = []
+
+            logger.info(f"Starting ensemble prediction | models={self.top_models}")
+            logger.info(f"Input shape: {X_df.shape}")
+            logger.info(f"Input preview:\n{X_df.head()}")
+
+            X_label = cat_encoding.Cat_LabelEncoding(X_df, category_cols)
+            X_onehot = cat_encoding.Cat_OneHotEncoding(X_df, category_cols)
+            X_onehot = X_onehot.reindex(columns=self.onehot_cols, fill_value=0)
+
+            for name in self.top_models:
+                model_info = self.trained_models[name]
+
+                logger.info(f"Running model: {name} | type={model_info['type']}")
+
+                if model_info["type"] == "linear":
+                    pred = model_info["model"].predict(X_onehot)
+                else:
+                    pred = model_info["model"].predict(X_label)
+
+                logger.info(
+                    f"[{name}] prediction stats -> shape={pred.shape}, "
+                    f"mean={np.mean(pred):.4f}, std={np.std(pred):.4f}"
+                )
+
+                preds.append(pred)
+
+            logger.info("Inference complete")
+
+            pred = np.mean(preds, axis=0)[0]
 
         except Exception as e:
             logger.error(f"Prediction failed: {e}")
