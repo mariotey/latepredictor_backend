@@ -9,7 +9,7 @@ from config import CATEGORY_ID_COL, FEATURES_NAME
 logger = setup_logger()
 
 
-def train_preprocess(features_dict):
+def train_preprocess(features_dict, train_df):
     X_col = [
         col
         for col_types in features_dict["feature_col"].values()
@@ -20,7 +20,6 @@ def train_preprocess(features_dict):
 
     category_col = features_dict["feature_col"]["categorical"]
 
-    train_df = supabase_utils.extract_all_rows(FEATURES_NAME)
     logger.info(f"Loaded dataset: shape={train_df.shape}\n")
 
     # Basic checks

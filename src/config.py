@@ -28,6 +28,10 @@ ETL_GOOGLESHEET_DIR: Path = REPO_ROOT / "etl_googlesheet"
 FEATURE_ENGINEERING_DIR: Path = REPO_ROOT / "feature_engineering"
 FASTAPI_DIR: Path = REPO_ROOT / "fastapi_app"
 
+# Bucket Directory
+BUCKET_MODELS_DIR: str = "models"
+BUCKET_IMG_DIR: str = "img"
+
 # Feature Registry Path
 FEATURE_REGISTRY_INPUT_PATH: Path = FEATURE_ENGINEERING_DIR / "feature_registry.yaml"
 

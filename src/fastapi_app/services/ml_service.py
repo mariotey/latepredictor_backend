@@ -8,6 +8,7 @@ import utils.supabase_utils as supabase_utils
 from utils import cat_encoding
 from utils.logger import setup_logger
 from config import (
+    FEATURES_NAME,
     FEATURE_REGISTRY_CONFIG_COL,
     FEATURE_REGISTRY_VER_COL,
 )
@@ -31,7 +32,11 @@ class MLService:
     def load_models(self):
         try:
             self.trained_models, self.onehot_cols, self.top_models = supabase_utils.load_model_artefacts()
-            logger.info("✅ Model Artefacts loaded")
+
+            if any(x is None for x in (self.trained_models, self.onehot_cols, self.top_models)):
+                logger.info("🔥 No Model Artefacts found, attempting to retrain...")
+                self.train()
+                logger.info("✅ Model Artefacts loaded")
 
         except Exception as e:
             logger.error(f"⚠️ Model Artefacts loading failed: {e}")
@@ -39,7 +44,9 @@ class MLService:
 
     def train(self):
         try:
-            X_df, y, category_cols = train_preprocess(self.features)
+            train_df = supabase_utils.extract_all_rows(FEATURES_NAME)
+
+            X_df, y, category_cols = train_preprocess(self.features, train_df)
 
             trained_models, top_models, X_onehot_cols, mse = train(X_df, y, category_cols)
 

@@ -17,7 +17,8 @@ from config import (
     FEATURE_REGISTRY_VER_COL,
     MODEL_REGISTRY_TOP_MODELS_COL,
     TRAINED_MODELS_NAME,
-    ONEHOT_COLS_NAME
+    ONEHOT_COLS_NAME,
+    BUCKET_MODELS_DIR
 )
 
 # Logging setup
@@ -62,7 +63,8 @@ def get_latest_feature_registry(table_name = FEATURE_REGISTRY_NAME):
     data = res.data
 
     if not data:
-        raise ValueError(f"No features found in {table_name}")
+        logger.error(f"No features found in {table_name}")
+        return None
 
     return data[0]
 
@@ -78,7 +80,8 @@ def get_latest_model_registry(table_name = MODEL_REGISTRY_NAME):
     )
 
     if not res.data:
-        raise ValueError(f"No models found in {table_name}")
+        logger.error(f"No models found in {table_name}")
+        return None
 
     return res.data[0]
 
@@ -106,7 +109,7 @@ def save_model_artefacts(
     mse
 ):
     model_id = str(uuid.uuid4())
-    base_path = f"{model_id}"
+    base_path = f"{BUCKET_MODELS_DIR}/{model_id}"
 
     # Save registry row
     response = (
@@ -118,7 +121,7 @@ def save_model_artefacts(
             "f_reg_version": feature_registry_ver,
             "mse": float(mse) if mse is not None else None
         })
-        .select("*")   # 🔥 IMPORTANT: return inserted row
+        .select("*")
         .execute()
     )
 
@@ -148,9 +151,10 @@ def save_model_artefacts(
 def load_model_artefacts():
     model_registry = get_latest_model_registry()
 
-    storage_path = model_registry["storage_path"]
+    if not model_registry:
+        return None, None, None
 
-    print(f"Loading {storage_path}")
+    storage_path = model_registry["storage_path"]
 
     def load_artifact(storage_path: str):
         response = SUPABASE_CLIENT.storage.from_(SUPABASE_BUCKET).download(storage_path)
@@ -164,7 +168,7 @@ def load_model_artefacts():
         return joblib.load(buffer)
 
     trained_models = load_artifact(f"{storage_path}/{TRAINED_MODELS_NAME}")
-    onehot_columns = load_artifact(f"{storage_path}/{ONEHOT_COLS_NAME}")
+    onehot_cols = load_artifact(f"{storage_path}/{ONEHOT_COLS_NAME}")
 
     top_models = model_registry[MODEL_REGISTRY_TOP_MODELS_COL]
 
@@ -173,4 +177,4 @@ def load_model_artefacts():
     else:
         top_models = []
 
-    return trained_models, onehot_columns, top_models
+    return trained_models, onehot_cols, top_models
