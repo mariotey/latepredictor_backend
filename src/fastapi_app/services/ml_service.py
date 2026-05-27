@@ -6,10 +6,11 @@ from utils.supabase_utils import SUPABASE_CLIENT
 from utils import cat_encoding
 from utils.logger import setup_logger
 from config import (
+    CATEGORY_NAME,
     FEATURES_NAME,
-    FEATURE_REGISTRY_CONFIG_COL,
-    FEATURE_REGISTRY_VER_COL,
-    CATEGORY_NAME
+    FEATURE_REGISTRY_ID_COL,
+    FEATURE_REGISTRY_ID_VAL,
+    MODEL_REGISTRY_ID_VAL
 )
 
 # Logging setup
@@ -17,9 +18,8 @@ logger = setup_logger()
 
 
 class EnsemblePredictor:
-    def __init__(self, trained_models, top_models, onehot_cols, features):
+    def __init__(self, trained_models, onehot_cols, features):
         self.trained_models = trained_models
-        self.top_models = top_models
         self.onehot_cols = onehot_cols
         self.features = features
 
@@ -32,9 +32,9 @@ class EnsemblePredictor:
 
         preds = []
 
-        logger.info(f"Starting ensemble prediction | models={self.top_models}")
+        logger.info(f"Starting ensemble prediction | models={list(self.trained_models.keys())}")
 
-        for name in self.top_models:
+        for name, model_info in self.trained_models.items():
             model_info = self.trained_models[name]
 
             logger.info(f"Running model: {name} | type={model_info['type']}")
@@ -65,18 +65,10 @@ class EnsemblePredictor:
 
 class MLService:
     def __init__(self):
-        self.model_registry = supabase_utils.get_latest_model_registry()
-
-        feature_registry_info = supabase_utils.get_latest_feature_registry()
-        self.feature_registry = feature_registry_info[FEATURE_REGISTRY_CONFIG_COL]
-        self.feature_registry_ver = feature_registry_info[FEATURE_REGISTRY_VER_COL]
-
-        logger.info(
-            f"📦 Features loaded (ver. {self.feature_registry_ver}) into ML Service"
-        )
+        self.feature_registry = supabase_utils.get_feature_registry(FEATURE_REGISTRY_ID_VAL)
+        self.model_registry = supabase_utils.get_model_registry(FEATURE_REGISTRY_ID_VAL, MODEL_REGISTRY_ID_VAL)
 
         self.trained_models = None
-        self.top_models = None
         self.onehot_cols = None
         self.predictor = None
 
@@ -90,25 +82,27 @@ class MLService:
 
             train_df = supabase_utils.extract_all_rows(FEATURES_NAME)
 
+            print(self.feature_registry)
+
             X_df, y, category_cols = train_preprocess(self.feature_registry, train_df)
 
-            trained_models, top_models, onehot_cols, mse = train(X_df, y, category_cols)
+            trained_models, onehot_encode_cols, ensemble_metrics_df = train(X_df, y, category_cols)
+            ensemble_metrics_df[FEATURE_REGISTRY_ID_COL] = FEATURE_REGISTRY_ID_VAL
 
-            supabase_utils.save_model_artefacts(
+            saved_model_ids = supabase_utils.save_model_artefacts(
                 trained_models=trained_models,
-                onehot_columns=onehot_cols,
-                top_models=top_models,
-                feature_registry_ver=self.feature_registry_ver,
-                mse=mse
+                onehot_columns=onehot_encode_cols,
+                ensemble_metrics_dict = ensemble_metrics_df.to_dict("records")[0]
             )
+
+            self.model_registry = supabase_utils.get_model_registry(FEATURE_REGISTRY_ID_VAL, saved_model_ids)
 
             model_artefacts = supabase_utils.get_model_artefacts(self.model_registry)
 
-        self.trained_models, self.onehot_cols, self.top_models = model_artefacts
+        self.trained_models, self.onehot_cols = model_artefacts
 
         self.predictor = EnsemblePredictor(
             self.trained_models,
-            self.top_models,
             self.onehot_cols,
             self.feature_registry
         )

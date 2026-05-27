@@ -36,7 +36,7 @@ Invoke-RestMethod -Uri "http://127.0.0.1:8000/feedback" `
 """
 from .core.fastapi_builder import create_fastapi_app
 from .core.request_schema import PredictRequest, FeedbackRequest
-from fastapi import Request, BackgroundTasks
+from fastapi import Request
 from .pipelines.data_feedback import feedback_data
 from .services.ml_service import MLService
 from utils.logger import setup_logger
@@ -69,7 +69,7 @@ def predict(payload: PredictRequest, request: Request):
 
     ml_service = request.app.state.ml_service
 
-    if ml_service.trained_models is None or ml_service.top_models is None:
+    if ml_service.trained_models is None:
         return {"error": "Model not trained yet"}
 
     return ml_service.predict(payload)

@@ -15,26 +15,31 @@ CLI usage (from repo root or src/):
 """
 import os
 import numpy as np
-import logging
+import pandas as pd
 from sklearn.model_selection import LeaveOneOut
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.base import clone
-import joblib
 from . import preprocess
-from utils import cat_encoding
+from utils.cat_encoding import Cat_LabelEncoding, Cat_OneHotEncoding
 from utils.logger import setup_logger
 from config import (
-    ENSEMBLE_NUM
+    ENSEMBLE_NUM,
+    ENSEMBLE_RANKING_METRIC,
+    ENSEMBLE_STRATEGY
 )
 from ..models.models import LINEAR_MODELS, TREE_MODELS
+
+ensemble_metrics_col = ["mae", "mse", "rmse", "top_models", "ensemble_type"]
 
 # Logging setup
 logger = setup_logger()
 
 
-def loocv_mse(model, X, y):
+def loocv_metrics(model, X, y):
     loo = LeaveOneOut()
-    errors = []
+
+    y_true_all = []
+    y_pred_all = []
 
     n = len(X)
     logger.info(f"[LOOCV with {model}] Starting | samples={n}")
@@ -47,21 +52,35 @@ def loocv_mse(model, X, y):
         model_clone.fit(X_train, y_train)
 
         pred = model_clone.predict(X_test)
-        errors.append(mean_squared_error(y_test, pred))
+
+        y_true_all.extend(y_test.values)
+        y_pred_all.extend(pred)
 
         if i % 50 == 0:
             logger.debug(f"\n[LOOCV with {model}] Progress {i}/{n}\n")
 
-    mse = np.mean(errors)
-    logger.info(f"[LOOCV with {model} COMPLETE] MSE={mse:.6f}\n")
+    mae = mean_absolute_error(y_true_all, y_pred_all)
+    mse = mean_squared_error(y_true_all, y_pred_all)
+    rmse = np.sqrt(mse)
 
-    return mse
+    logger.info(
+        f"[LOOCV COMPLETE] "
+        f"MAE={mae:.6f} | "
+        f"MSE={mse:.6f} | "
+        f"RMSE={rmse:.6f}"
+    )
+
+    return {
+        "mae": mae,
+        "mse": mse,
+        "rmse": rmse
+    }
 
 
 def train(X_df, y, category_cols):
     # Encoding
-    X_label = cat_encoding.Cat_LabelEncoding(X_df, category_cols)
-    X_onehot = cat_encoding.Cat_OneHotEncoding(X_df, category_cols)
+    X_label = Cat_LabelEncoding(X_df, category_cols)
+    X_onehot = Cat_OneHotEncoding(X_df, category_cols)
 
     logger.info(f"Encoded datasets ready | Label: {X_label.shape}, OneHot: {X_onehot.shape}\n")
 
@@ -69,40 +88,63 @@ def train(X_df, y, category_cols):
 
     # Linear models (one-hot encoding)
     for model_name, model in LINEAR_MODELS:
-        mse = loocv_mse(model, X_onehot, y)
+        metrics = loocv_metrics(model, X_onehot, y)
         results[model_name] = {
-            "mse": mse,
+            **metrics,
             "model": model,
             "type": "linear"
         }
 
     # Tree models (label encoding)
     for model_name, model in TREE_MODELS:
-        mse = loocv_mse(model, X_label, y)
+        metrics = loocv_metrics(model, X_label, y)
         results[model_name] = {
-            "mse": mse,
+            **metrics,
             "model": model,
             "type": "tree"
         }
 
-    # Rank models
-    sorted_results = sorted(results.items(), key=lambda x: x[1]["mse"])
+    # Build metrics dataframe
+    metrics_df = pd.DataFrame([
+        {
+            "model_name": name,
+            "mse": result["mse"],
+            "rmse": result["rmse"],
+            "mae": result["mae"],
+            "type": result["type"]
+        }
+        for name, result in results.items()
+    ])
 
-    logger.info("\n========== MODEL RANKING ==========")
-    for rank, (model_name, model_result) in enumerate(sorted_results):
-        logger.info(f"{rank+1}. {model_name} | MSE={model_result['mse']:.6f} | type={model_result['type']}")
+    # Rank using MSE only
+    metrics_df = (
+        metrics_df
+        .sort_values(ENSEMBLE_RANKING_METRIC)
+        .reset_index(drop=True)
+    )
 
-    # Select top N models based on LOOCV results
-    top_models = [name for name, _ in sorted_results[:ENSEMBLE_NUM]]
+    metrics_df["rank"] = metrics_df.index + 1
+    metrics_df["selected"] = False
+
+    metrics_df.loc[
+        :ENSEMBLE_NUM-1,
+        "selected"
+    ] = True
+
+    # Choosing top models based on MSE
+    top_models = metrics_df[metrics_df["selected"]]["model_name"].tolist()
 
     logger.info(f"\n\nSelected top models: {top_models}\n")
 
-    # Retrain each selected model using ALL available data
+    # Retrain only selected models with ALL available data
     trained_models = {}
 
     logger.info("Retraining top models...\n")
 
-    for model_name, model_result in results.items():
+    for model_name in top_models:
+
+        model_result = results[model_name]
+
         try:
             # Create a fresh copy of the model
             model = clone(model_result["model"])
@@ -121,21 +163,34 @@ def train(X_df, y, category_cols):
             trained_models[model_name] = {
                 "model": model,
                 "type": model_result["type"],
-                "mse": model_result["mse"]
+                "metrics": {
+                    "mse": model_result["mse"],
+                    "rmse": model_result["rmse"],
+                    "mae": model_result["mae"]
+                }
             }
 
-            logger.info(f"Training of {model_name} complete\n\n")
+            logger.info(f"Training {model_name} complete\n\n")
 
         except Exception as e:
             raise ValueError(f"❌ Failed training {model_name}: {repr(e)}")
             continue
 
-    ensemble_mse = np.mean(
-        [results[m]["mse"] for m in top_models]
+    ensemble_metrics_df = (
+        metrics_df[metrics_df["selected"]]
+        .agg({
+            "mae": ENSEMBLE_STRATEGY,
+            "mse": ENSEMBLE_STRATEGY,
+            "rmse": ENSEMBLE_STRATEGY
+        })
+        .to_frame()
+        .T
     )
 
-    return trained_models, top_models, X_onehot.columns, ensemble_mse
+    ensemble_metrics_df["top_models"] = ", ".join(top_models)
+    ensemble_metrics_df["ensemble_type"] = ENSEMBLE_STRATEGY
 
+    return trained_models, X_onehot.columns, ensemble_metrics_df[ensemble_metrics_col]
 
 if __name__ == "__main__":
     train()

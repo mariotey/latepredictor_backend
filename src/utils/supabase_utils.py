@@ -11,13 +11,12 @@ from .logger import setup_logger
 from config import (
     FEATURE_REGISTRY_NAME,
     MODEL_REGISTRY_NAME,
-    FEATURES_NAME,
     FEEDBACK_NAME,
+    FEATURE_REGISTRY_ID_COL,
     FEATURE_REGISTRY_CONFIG_COL,
-    FEATURE_REGISTRY_VER_COL,
-    MODEL_REGISTRY_TOP_MODELS_COL,
+    MODEL_REGISTRY_ID_COL,
     TRAINED_MODELS_NAME,
-    ONEHOT_COLS_NAME,
+    ONEHOT_ENCODE_COLS_NAME,
     BUCKET_MODELS_DIR
 )
 
@@ -50,43 +49,52 @@ def extract_all_rows(table_name):
     return pd.DataFrame(res.data)
 
 
-def get_latest_feature_registry(table_name = FEATURE_REGISTRY_NAME):
-    res = (
-        SUPABASE_CLIENT
-        .table(FEATURE_REGISTRY_NAME)
-        .select(FEATURE_REGISTRY_CONFIG_COL, FEATURE_REGISTRY_VER_COL)
-        .order(FEATURE_REGISTRY_VER_COL, desc=True)
-        .limit(1)
-        .execute()
-    )
+def get_feature_registry(f_reg_id):
+    try:
+        res = (
+            SUPABASE_CLIENT
+            .table(FEATURE_REGISTRY_NAME)
+            .select("*")
+            .eq(FEATURE_REGISTRY_ID_COL, f_reg_id)
+            .single()
+            .execute()
+        )
 
-    data = res.data
+        logger.info("✅ Feature Registry loaded successfully\n")
+        return res.data[FEATURE_REGISTRY_CONFIG_COL]
 
-    if not data:
-        logger.error(f"No features found in {table_name}")
+    except Exception as e:
+        logger.error(
+            f"{f_reg_id} not found in {FEATURE_REGISTRY_NAME}: {repr(e)}"
+        )
         return None
 
-    return data[0]
 
+def get_model_registry(f_reg_id, model_id):
+    try:
+        res = (
+            SUPABASE_CLIENT
+            .table(MODEL_REGISTRY_NAME)
+            .select("*")
+            .eq(FEATURE_REGISTRY_ID_COL, f_reg_id)
+            .eq(MODEL_REGISTRY_ID_COL, model_id)
+            .single()
+            .execute()
+        )
 
-def get_latest_model_registry(table_name = MODEL_REGISTRY_NAME):
-    res = (
-        SUPABASE_CLIENT
-        .table(MODEL_REGISTRY_NAME)
-        .select("*")
-        .order("created_at", desc=True)
-        .limit(1)
-        .execute()
-    )
+        logger.info("✅ Model Registry loaded successfully\n")
 
-    if not res.data:
-        logger.error(f"No models found in {table_name}")
+        return res.data
+
+    except Exception as e:
+        logger.error(
+            f"{model_id} using {f_reg_id} "
+            f"not found in {MODEL_REGISTRY_NAME}: {repr(e)}"
+        )
         return None
 
-    return res.data[0]
 
-
-def load_table_into_supabase(df, table_name = FEEDBACK_NAME):
+def save_table_into_supabase(df, table_name = FEEDBACK_NAME):
     records = df.to_dict("records")
 
     # Clean NaNs, although should not be present at this stage
@@ -104,9 +112,7 @@ def load_table_into_supabase(df, table_name = FEEDBACK_NAME):
 def save_model_artefacts(
     trained_models,
     onehot_columns,
-    top_models,
-    feature_registry_ver,
-    mse
+    ensemble_metrics_dict
 ):
     model_id = str(uuid.uuid4())
     base_path = f"{BUCKET_MODELS_DIR}/{model_id}"
@@ -117,16 +123,14 @@ def save_model_artefacts(
         .insert({
             "model_id": model_id,
             "storage_path": base_path,
-            "top_models": ",".join(top_models) if top_models else "",
-            "f_reg_version": feature_registry_ver,
-            "mse": float(mse) if mse is not None else None
+            **ensemble_metrics_dict
         })
         .select("*")
         .execute()
     )
 
     model_path = f"{base_path}/{TRAINED_MODELS_NAME}"
-    columns_path = f"{base_path}/{ONEHOT_COLS_NAME}"
+    columns_path = f"{base_path}/{ONEHOT_ENCODE_COLS_NAME}"
 
     def save_artifact(obj, storage_path):
         buffer = io.BytesIO()
@@ -147,10 +151,12 @@ def save_model_artefacts(
     save_artifact(trained_models, model_path)
     save_artifact(onehot_columns, columns_path)
 
+    return model_id
+
 
 def get_model_artefacts(model_registry):
     if not model_registry:
-        return None, None, None
+        return None, None
 
     storage_path = model_registry["storage_path"]
 
@@ -166,13 +172,6 @@ def get_model_artefacts(model_registry):
         return joblib.load(buffer)
 
     trained_models = load_artifact(f"{storage_path}/{TRAINED_MODELS_NAME}")
-    onehot_cols = load_artifact(f"{storage_path}/{ONEHOT_COLS_NAME}")
+    onehot_cols = load_artifact(f"{storage_path}/{ONEHOT_ENCODE_COLS_NAME}")
 
-    top_models = model_registry[MODEL_REGISTRY_TOP_MODELS_COL]
-
-    if top_models:
-        top_models = top_models.split(",")
-    else:
-        top_models = []
-
-    return trained_models, onehot_cols, top_models
+    return trained_models, onehot_cols

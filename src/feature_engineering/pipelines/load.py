@@ -1,12 +1,12 @@
 import pandas as pd
 import json
 from supabase import create_client
-from utils.supabase_utils import get_info, get_latest_feature_registry, SUPABASE_CLIENT
+from utils.supabase_utils import SUPABASE_CLIENT
 from config import (
     FEATURES_NAME,
     FEATURE_REGISTRY_NAME,
     FEATURES_ID_COL,
-    FEATURE_REGISTERY_ID_COL,
+    FEATURE_REGISTRY_ID_COL,
     FEATURE_REGISTRY_CONFIG_COL
 )
 
@@ -37,7 +37,7 @@ def save_registry_into_supabase(feature_registry_dict):
 
     res_data = (
         SUPABASE_CLIENT.table(FEATURE_REGISTRY_NAME)
-        .select(FEATURE_REGISTERY_ID_COL)
+        .select(FEATURE_REGISTRY_ID_COL)
         .eq(FEATURE_REGISTRY_CONFIG_COL, config_json)
         .limit(1)
         .execute()
