@@ -10,6 +10,7 @@ from config import (
     FEATURES_NAME,
     FEATURE_REGISTRY_ID_COL,
     FEATURE_REGISTRY_ID_VAL,
+    MODEL_REGISTRY_ID_COL,
     MODEL_REGISTRY_ID_VAL
 )
 
@@ -76,26 +77,41 @@ class MLService:
     def initialize(self):
         model_artefacts = supabase_utils.get_model_artefacts(self.model_registry)
 
-        # If missing → retrain pipeline
-        if any(x is None for x in model_artefacts):
-            logger.info("🔥 No Model Artefacts found → training new model")
+        # If model artefacts are missing,
+        if self.model_registry is None or any(x is None for x in model_artefacts):
+            logger.warning(f"🔥 Model artefacts from model registry cannot be loaded")
 
-            train_df = supabase_utils.extract_all_rows(FEATURES_NAME)
-
-            print(self.feature_registry)
-
-            X_df, y, category_cols = train_preprocess(self.feature_registry, train_df)
-
-            trained_models, onehot_encode_cols, ensemble_metrics_df = train(X_df, y, category_cols)
-            ensemble_metrics_df[FEATURE_REGISTRY_ID_COL] = FEATURE_REGISTRY_ID_VAL
-
-            saved_model_ids = supabase_utils.save_model_artefacts(
-                trained_models=trained_models,
-                onehot_columns=onehot_encode_cols,
-                ensemble_metrics_dict = ensemble_metrics_df.to_dict("records")[0]
+            # Get the latest created model registry
+            latest_registry = supabase_utils.get_latest_model_registry(
+                FEATURE_REGISTRY_ID_VAL
             )
 
-            self.model_registry = supabase_utils.get_model_registry(FEATURE_REGISTRY_ID_VAL, saved_model_ids)
+            # If model registry is not empty load the last created model artefacts
+            if latest_registry:
+                logger.warning(f"🔁 Loading model artefacts from {latest_registry[MODEL_REGISTRY_ID_COL]} created on {latest_registry['created_at']} instead")
+
+                self.model_registry = latest_registry
+
+            # If the model registry is empty, retrain the model again
+            else:
+                logger.info("🔥 No Model Artefacts found → training new model")
+
+                train_df = supabase_utils.extract_all_rows(FEATURES_NAME)
+
+                X_df, y, category_cols = train_preprocess(self.feature_registry, train_df)
+
+                trained_models, onehot_encode_cols, ensemble_metrics_df = train(X_df, y, category_cols)
+                ensemble_metrics_df[FEATURE_REGISTRY_ID_COL] = FEATURE_REGISTRY_ID_VAL
+
+                saved_model_ids = supabase_utils.save_model_artefacts(
+                    trained_models=trained_models,
+                    onehot_columns=onehot_encode_cols,
+                    ensemble_metrics_dict = ensemble_metrics_df.to_dict("records")[0]
+                )
+
+                self.model_registry = supabase_utils.get_model_registry(FEATURE_REGISTRY_ID_VAL, saved_model_ids)
+
+            logger.info("✅ Model Artefacts successfully loaded")
 
             model_artefacts = supabase_utils.get_model_artefacts(self.model_registry)
 

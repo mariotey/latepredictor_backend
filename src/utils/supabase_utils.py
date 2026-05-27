@@ -23,22 +23,16 @@ from config import (
 # Logging setup
 logger = setup_logger()
 
+# Load environment variables
+load_dotenv()
 
-def get_info():
-    # Load environment variables
-    load_dotenv()
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY")
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
 
-    SUPABASE_URL = os.getenv("SUPABASE_URL")
-    SUPABASE_KEY = os.getenv("SUPABASE_SECRET_KEY")
-    SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
-
-    # Check if the values obtained are valid
-    if not all([SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET]):
-        raise ValueError("Missing Supabase configuration")
-
-    return SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET
-
-SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET = get_info()
+# Check if the values obtained are valid
+if not all([SUPABASE_URL, SUPABASE_KEY, SUPABASE_BUCKET]):
+    raise ValueError("Missing Supabase configuration")
 
 # Create client once
 SUPABASE_CLIENT = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -93,6 +87,22 @@ def get_model_registry(f_reg_id, model_id):
         )
         return None
 
+
+def get_latest_model_registry(f_reg_id):
+    res = (
+        SUPABASE_CLIENT
+        .table(MODEL_REGISTRY_NAME)
+        .select("*")
+        .eq(FEATURE_REGISTRY_ID_COL, f_reg_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if not res.data:
+        return None
+
+    return res.data[0]
 
 def save_table_into_supabase(df, table_name = FEEDBACK_NAME):
     records = df.to_dict("records")
