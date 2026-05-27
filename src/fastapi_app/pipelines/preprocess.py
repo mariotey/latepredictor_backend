@@ -30,9 +30,9 @@ def train_preprocess(features_dict, train_df):
 
     return train_df[X_col], train_df[y_col], category_col
 
-def predict_preprocess(features_dict, payload):
+def predict_preprocess(features_dict, payload_dict):
     # Derive features
-    meeting_datetime = payload.datetime_val
+    meeting_datetime = payload_dict["datetime_val"]
     hour = meeting_datetime.hour
 
     if hour >= 3 and hour < 12:
@@ -43,8 +43,8 @@ def predict_preprocess(features_dict, payload):
         time_of_day = "evening"
 
     distance_km = haversine(
-        payload.init_latlon,
-        payload.dest_latlon,
+        payload_dict["init_latlon"],
+        payload_dict["dest_latlon"],
         unit=Unit.KILOMETERS
     )
 
@@ -52,7 +52,7 @@ def predict_preprocess(features_dict, payload):
         "day_of_week": meeting_datetime.weekday(),
         "distance_km": round(distance_km, 2),
         "time_of_day": time_of_day,
-        "category": payload.category
+        "category": payload_dict["category"]
     }])
 
     X_col = [

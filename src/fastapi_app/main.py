@@ -22,24 +22,17 @@ python -m fastapi_app.main
 
 HOW TO RUN (CLI / POWERSHELL)
 
-curl -X POST "http://127.0.0.1:8000/predict" ^
--H "Content-Type: application/json" ^
--d "{\"datetime_val\":\"2026-05-06T15:30:00Z\",\"init_lonlat\":[1.3, 103.8],\"dest_lonlat\":[1.35, 103.9],\"category\":\"dinner\"}"
-
-OR:
-
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/predict" `
     -Method POST `
     -ContentType "application/json" `
-    -Body '{"datetime_val":"2026-05-06T15:30:00Z","init_latlon":[1.3, 103.8],"dest_latlon":[1.35, 103.9],"category":"dinner"}'
+    -Body '{"datetime_val":"2026-05-06T15:30:00Z","init_latlon":[1.3, 103.8],"dest_latlon":[1.35, 103.9],"category_id":"c59c0d90-d940-4f0c-a29a-c48c0bf6d9f9"}'
 
 ----------------------------------------------------------------------
 
 Invoke-RestMethod -Uri "http://127.0.0.1:8000/feedback" `
     -Method POST `
     -ContentType "application/json" `
-    -Body '{"meeting_location": "Bukit Panjang Plaza", "meeting_datetime":"2026-05-06T15:30:00Z","init_latlon":[1.3, 103.8],"meeting_latlon":[1.35, 103.9],"category_id":"4ea1b39c-3be4-4cb8-9279-0befb9c030a8","pred_min":19,"arrived_datetime":"2026-05-06T18:30:00Z"}'
-
+    -Body '{"meeting_location": "Bukit Panjang Plaza", "meeting_datetime":"2026-05-06T15:30:00Z","init_latlon":[1.3, 103.8],"meeting_latlon":[1.35, 103.9],"category_id":"c59c0d90-d940-4f0c-a29a-c48c0bf6d9f9","pred_min":19,"arrived_datetime":"2026-05-06T18:30:00Z"}'
 """
 from .core.fastapi_builder import create_fastapi_app
 from .core.request_schema import PredictRequest, FeedbackRequest

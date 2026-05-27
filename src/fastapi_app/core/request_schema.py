@@ -6,7 +6,7 @@ class PredictRequest(BaseModel):
     datetime_val: datetime = Field(..., description="ISO 8601 timestamp of the event")
     init_latlon: Tuple[float, float] = Field(..., description="(latitude, longitude) of origin")
     dest_latlon: Tuple[float, float] = Field(..., description="(latitude, longitude) of destination")
-    category: str = Field(..., description="Activity category (e.g. dinner/drinks)")
+    category_id: str = Field(..., description="The categorical ID of the activity")
 
 class FeedbackRequest(BaseModel):
     meeting_location: str = Field(..., description="Address of the meeting location")

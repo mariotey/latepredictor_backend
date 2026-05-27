@@ -2,12 +2,14 @@ import numpy as np
 from ..pipelines.train import train
 from ..pipelines.preprocess import train_preprocess, predict_preprocess
 import utils.supabase_utils as supabase_utils
+from utils.supabase_utils import SUPABASE_CLIENT
 from utils import cat_encoding
 from utils.logger import setup_logger
 from config import (
     FEATURES_NAME,
     FEATURE_REGISTRY_CONFIG_COL,
     FEATURE_REGISTRY_VER_COL,
+    CATEGORY_NAME
 )
 
 # Logging setup
@@ -21,8 +23,8 @@ class EnsemblePredictor:
         self.onehot_cols = onehot_cols
         self.features = features
 
-    def predict(self, payload):
-        X_df, _, category_cols = predict_preprocess(self.features, payload)
+    def predict(self, payload_dict):
+        X_df, _, category_cols = predict_preprocess(self.features, payload_dict)
 
         X_label = cat_encoding.Cat_LabelEncoding(X_df, category_cols)
         X_onehot = cat_encoding.Cat_OneHotEncoding(X_df, category_cols)
@@ -115,7 +117,22 @@ class MLService:
 
     # Prediction
     def predict(self, payload):
+        result = (
+            SUPABASE_CLIENT
+            .table(CATEGORY_NAME)
+            .select("category")
+            .eq("category_id", payload.category_id)
+            .single()
+            .execute()
+        )
+
+        payload_dict = payload.model_dump()
+        payload_dict["category"] = result.data["category"]
+        payload_dict.pop("category_id", None)
+
+        print(f"\n\n{payload_dict}\n\n")
+
         if self.predictor is None:
             raise ValueError("Model not initialized. Call initialize() first.")
 
-        return self.predictor.predict(payload)
+        return self.predictor.predict(payload_dict)
