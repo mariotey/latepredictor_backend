@@ -53,10 +53,10 @@ def run_pipeline():
     features_df = features_df[selected_cols].reset_index(drop=True)
 
     print(features_df, "\n")
-    load.load_features_into_supabase(features_df)
+    load.save_features_into_supabase(features_df)
 
     print(feature_registry_dict, "\n")
-    load.load_registry_into_supabase(feature_registry_dict)
+    load.save_registry_into_supabase(feature_registry_dict)
 
 
 if __name__ == "__main__":

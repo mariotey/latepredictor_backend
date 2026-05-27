@@ -1,17 +1,19 @@
 import pandas as pd
 import json
 from supabase import create_client
-from utils.supabase_utils import get_info, get_latest_feature_registry
-from config import FEATURES_NAME, FEATURE_REGISTRY_NAME, FEATURES_ID_COL
+from utils.supabase_utils import get_info, get_latest_feature_registry, SUPABASE_CLIENT
+from config import (
+    FEATURES_NAME,
+    FEATURE_REGISTRY_NAME,
+    FEATURES_ID_COL,
+    FEATURE_REGISTERY_ID_COL,
+    FEATURE_REGISTRY_CONFIG_COL
+)
 
-SUPABASE_URL, SUPABASE_KEY = get_info()
 
-# Create client once
-supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-def load_features_into_supabase(df):
+def save_features_into_supabase(df):
     # Wipe old data first
-    supabase_client.rpc(f"truncate_{FEATURES_NAME.lower()}").execute()
+    SUPABASE_CLIENT.rpc(f"truncate_{FEATURES_NAME.lower()}").execute()
 
     # Insert fresh data
     records = [
@@ -19,7 +21,7 @@ def load_features_into_supabase(df):
         for row in df.to_dict("records")
     ]
 
-    supabase_client.table(FEATURES_NAME).upsert(
+    SUPABASE_CLIENT.table(FEATURES_NAME).upsert(
         records,
         on_conflict=FEATURES_ID_COL
     ).execute()
@@ -27,37 +29,25 @@ def load_features_into_supabase(df):
     print("✅ Loaded into Supabase successfully\n")
 
 
-def load_registry_into_supabase(feature_registry_dict):
-    # Extract the latest feature registry
-    latest = get_latest_feature_registry()
+def save_registry_into_supabase(feature_registry_dict):
+    config_json = json.dumps(
+        feature_registry_dict,
+        sort_keys=True
+    )
 
-    # No previous record → first insert
-    if latest is None:
-        supabase_client.table(FEATURE_REGISTRY_NAME).insert({
-            "version": 1,
-            "config": feature_registry_dict
+    res_data = (
+        SUPABASE_CLIENT.table(FEATURE_REGISTRY_NAME)
+        .select(FEATURE_REGISTERY_ID_COL)
+        .eq(FEATURE_REGISTRY_CONFIG_COL, config_json)
+        .limit(1)
+        .execute()
+    ).data
+
+    if not res_data:
+        SUPABASE_CLIENT.table(FEATURE_REGISTRY_NAME).insert({
+            FEATURE_REGISTRY_CONFIG_COL: feature_registry_dict
         }).execute()
 
-        print("✅ Inserted first registry version\n")
-        return
-
-    latest_config = latest["config"]
-    latest_version = latest["version"]
-
-    def normalize(d):
-        return json.dumps(d, sort_keys=True)
-
-    # Compare
-    if normalize(latest_config) == normalize(feature_registry_dict):
+        print("✅ Loaded new registry into Supabase successfully\n")
+    else:
         print("🟡 Registry unchanged — skipping insert\n")
-        return
-
-    new_version = latest_version + 1
-
-    # Insert new version
-    supabase_client.table(FEATURE_REGISTRY_NAME).insert({
-        "version": new_version,
-        "config": feature_registry_dict
-    }).execute()
-
-    print(f"✅ Loaded registry (ver {new_version}) into Supabase successfully\n")
